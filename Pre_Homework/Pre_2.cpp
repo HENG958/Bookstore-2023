@@ -55,7 +55,7 @@ public:
     }*/
     void write(T &t, long long place_size, int size = 1) {
       file.open(file_name, std::ios::in | std::ios::out);
-      file.seekp(0, std::ios::end);
+      file.seekp(place_size);
       int index = file.tellp();
       file.write(reinterpret_cast<char *>(&t), sizeof(T) * size);
       file.close();
@@ -143,23 +143,31 @@ int find_whichblock(Block &target_data)
   int blocknum;//一共有多少个块
   int index = 1;//最终应该是在第几个块里进行操作
   DataBase.get_info(blocknum, 1);
-  DataBase.read(list_index[1], 12, blocknum);//把整个模拟链表的数组给读出来
-  while (!(target_data < list_index[index]))
+  //cout << blocknum << endl;
+  DataBase.read(list_index[1], 8, blocknum);//把整个模拟链表的数组给读出来
+  //cout << list_index[1].block_next << endl;
+  for (int index_now = 1;index_now != 0;index_now = list_index[index_now].block_next)
   {
-    int temp = index;
-    index = list_index[temp].block_next;
+    if (target_data < list_index[index_now])
+    {
+     // cout << index << endl;
+      return index;
+    }
+    index = index_now;
   }
+  
   return index;
 }//找到应该在哪一个块里操作这个数据
 
 
-Block insert(Block &target_data, int element_num)
+Block insert(Block &target_data, int element_num, bool insert_flag)
 {
   DataBase.read(list_data[1], pos * sizeof(Block) * limited_elementnum + 8, element_num);//把整个块读出来
   int insert_pos = lower_bound(list_data + 1, list_data + element_num + 1, target_data) - list_data - 1;
+  //cout << insert_pos << endl;
   if (list_data[insert_pos + 1] == target_data) 
   {
-    target_data.insert_flag = 1;
+    insert_flag = 1;
     return target_data;
   }//如果已经有重复的，就不插入进去了
   else if (insert_pos == 0)
@@ -172,13 +180,14 @@ Block insert(Block &target_data, int element_num)
   {
     DataBase.write(list_data[1], pos * sizeof(Block) * limited_elementnum + 8, insert_pos);//插入原数组的前inset_pos个
     DataBase.write(target_data, pos * sizeof(Block) * limited_elementnum + 8 + insert_pos * sizeof(Block));
-    DataBase.write(list_data[insert_pos + 1], pos * sizeof(Block) * limited_elementnum + 8 + (insert_pos + 1) * sizeof(Block), element_num - insert_pos);
+    if (insert_pos != element_num)
+      DataBase.write(list_data[insert_pos + 1], pos * sizeof(Block) * limited_elementnum + 8 + (insert_pos + 1) * sizeof(Block), element_num - insert_pos);
     //再插后面部分
     return list_data[1];
   }
 }//这一部分利用重新魔改write函数然后分别插入数组前半段和后半段的思路来源于llz同学，感恩
 
-bool find(Block &target_data, int element_num)
+bool find(Block &target_data, int element_num, bool &find_flag)
 {
   DataBase.read(list_data[1], pos * sizeof(Block) * limited_elementnum + 8, element_num);//把整个块读出来
   int find_pos = lower_bound(list_data + 1, list_data + element_num + 1, target_data) - list_data - 1;
@@ -186,7 +195,7 @@ bool find(Block &target_data, int element_num)
   {
     if (strcmp (target_data.index, list_data[i].index) == 0)
     {
-      target_data.find_flag = 1;
+      find_flag = 1;
       cout << list_data[i].value << " ";
     }//找到就输出所有符合条件的条目
     else return 0;
@@ -198,7 +207,8 @@ bool delete_data(Block &target_data, int element_num)
 {
   DataBase.read(list_data[1], pos * sizeof(Block) * limited_elementnum + 8, element_num);
   int delete_pos = lower_bound(list_data + 1, list_data + element_num + 1, target_data) - list_data - 1;
-  if ((target_data == list_data[delete_pos + 1]) != 0) return 0;//删的东西不存在
+  //cout << delete_pos << endl;
+  if ((target_data == list_data[delete_pos + 1]) == 0) return 0;//删的东西不存在
   else if (delete_pos == 0)
   {
     DataBase.write(list_data[2], pos * sizeof(Block) * limited_elementnum + 8, element_num - 1);
@@ -240,6 +250,11 @@ int main()
 {
   int n;
   cin >> n;
+  DataBase.initialise("DataBase2.txt");
+  Block test;
+  DataBase.read(test, 8 + sizeof(Block));
+  int temp;
+  DataBase.get_info(temp, 1);
   while (n--)
   {
     string str;
@@ -253,22 +268,27 @@ int main()
       if (blocknum == 0)
       {
         blocknum = 1;
-        target_info.block_pos = 1;
+        target_info.block_pos = 0;
         target_info.block_elementnum = 1;
         DataBase.write_info(blocknum, 1);
-        DataBase.write(target_info, 8);
+        DataBase.write(target_info, 8, 1);
         DataBase.write(target_info, 8 + limited_elementnum * sizeof (Block));
+        //cout << 1 << endl;
       }
       else  
       {
-        Block temp_now, temp_inserted;
+        Block temp_now, temp_inserted;  
         int indexblock = find_whichblock(target_info);
+        //cout << indexblock << endl;
         DataBase.read(temp_now, 8 + (indexblock - 1) * sizeof(Block));//找到需要更改的块的块头
         pos = temp_now.block_pos;//现在的位置
-        temp_inserted = insert (target_info, temp_now.block_elementnum);//插入以后的块头
+        bool insert_flag = 0;
+        temp_inserted = insert (target_info, temp_now.block_elementnum, insert_flag);//插入以后的块头
+        //cout << temp_inserted.value << endl;
         temp_inserted.block_elementnum = temp_now.block_elementnum + 1;
         temp_inserted.block_next = temp_now.block_next;
         temp_inserted.block_pos = temp_now.block_pos;//更新块头的各项数据指标
+        //cout << temp_inserted.block_elementnum << endl;
         DataBase.write(temp_inserted, 8 + (indexblock - 1) * sizeof(Block));//把块头写进去
         if (temp_inserted.block_elementnum > limited_elementnum - 5)
         {
@@ -292,16 +312,25 @@ int main()
       {
         Block temp_now;
         int indexblock = find_whichblock(target_info);
+        //cout << indexblock << endl;
         DataBase.read(temp_now, 8 + (indexblock - 1) * sizeof(Block));//找到需要查询的块的块头
         pos = temp_now.block_pos;//现在的位置
-        bool flag = find(target_info, temp_now.block_elementnum);
-        if (temp_now.find_flag == 0 || flag == 0)
+        bool find_flag = 0;
+        //cout << temp_now.block_elementnum << endl;
+        bool flag = 1;
+        while (flag)
+        {
+          flag = find(target_info, temp_now.block_elementnum, find_flag);
+          if (temp_now.block_next == 0) break;
+        }
+        //cout << find_flag << endl;
+        //cout << temp_now.find_flag << endl;
+        if (find_flag == 0)
         {
           cout << "null" << endl;
         }//如果找不到，那必然找不到
         else  
         {
-          temp_now.find_flag = 0;
           cout << endl;
         }//否则我就输出，然后重置一下判准
       }
@@ -319,6 +348,7 @@ int main()
         DataBase.read(temp_now, 8 + (indexblock - 1) * sizeof(Block));//找到需要删除的块的块头
         pos = temp_now.block_pos;
         bool flag = delete_data(target_info, temp_now.block_elementnum);//试图删除它
+        //cout << flag << endl;
         if (flag)//如果删除成功了
         {
           temp_now.block_elementnum--;
