@@ -2,7 +2,7 @@
 #include <bits/stdc++.h>
 #include <cstring>
 using namespace std;
-static const int limited_elementnum = 1000;
+static const int limited_elementnum = 10;
 template<class T, int info_len = 2>
 class MemoryRiver {
 private:
@@ -133,7 +133,7 @@ public:
     return (strcmp(index, other.index) == 0) && value == other.value;
   }
 };
-Block list_index[1000];//要找到是第几个块的索引数组（用数组模拟链表）
+Block list_index[1000];//要找到是第几个块的索引数组（用数组模拟链表），采用块头index和value记录数据的方法进行查找等功能，这里感谢zjx同学提供的思路
 Block list_data[1000];//在找到某个块以后，用这个数组来存储块中的数据
 MemoryRiver<Block, 2> DataBase;
 int pos;//第几个块
@@ -230,20 +230,20 @@ void block_split (int block_pos, int element_num)
   DataBase.write_info(blocknum, 1);
   int mid = element_num / 2;
   Block temp_now;
-  DataBase.read(temp_now, (block_pos - 1) * sizeof(Block) + 8);
-  DataBase.read(list_data[1], temp_now.block_pos * limited_elementnum * sizeof(Block) + 8, element_num);
+  DataBase.read(temp_now, (block_pos - 1) * sizeof(Block) + 8);//读出来原来的块头
+  DataBase.read(list_data[1], temp_now.block_pos * limited_elementnum * sizeof(Block) + 8, element_num);//读出来原来的块
   Block temp_split;
   temp_split = list_data[mid + 1];
   temp_split.block_elementnum = element_num - mid;
   temp_split.block_next = temp_now.block_next;
-  temp_split.block_pos = blocknum;
-  DataBase.write(list_data[mid + 1], blocknum * limited_elementnum * sizeof(Block) + 8, element_num - mid);
-  DataBase.write(temp_split, (blocknum - 1) * sizeof(Block) + 8);
-  temp_now.block_elementnum = mid;
+  temp_split.block_pos = blocknum;//把新块块头相关设定设定好
+  DataBase.write(list_data[mid + 1], blocknum * limited_elementnum * sizeof(Block) + 8, element_num - mid);//把裂出来的新块放到末尾
+  DataBase.write(temp_split, (blocknum - 1) * sizeof(Block) + 8);//把新块头写到块头末尾
+  temp_now.block_elementnum = mid;//llz同学证实了似乎确实可以通过改变这里的数据个数来假装后半部分没有元素了（）（）
   temp_now.block_next = blocknum;
-  DataBase.write(temp_now, (block_pos - 1) * sizeof(Block) + 8);
+  DataBase.write(temp_now, (block_pos - 1) * sizeof(Block) + 8);//把更新过的原块头写进去
   return ;
-}
+}//进行裂块操作
 
 
 int main()
@@ -251,10 +251,10 @@ int main()
   int n;
   cin >> n;
   DataBase.initialise("DataBase2.txt");
-  Block test;
-  DataBase.read(test, 8 + sizeof(Block));
-  int temp;
-  DataBase.get_info(temp, 1);
+  Block ini;
+  int ini1;
+  DataBase.read(ini, 8 + sizeof(Block));
+  DataBase.get_info(ini1, 1);
   while (n--)
   {
     string str;
@@ -274,7 +274,7 @@ int main()
         DataBase.write(target_info, 8, 1);
         DataBase.write(target_info, 8 + limited_elementnum * sizeof (Block));
         //cout << 1 << endl;
-      }
+      }//如果这是第一次，那我就直接设置好相关数值扔进去
       else  
       {
         Block temp_now, temp_inserted;  
@@ -293,7 +293,7 @@ int main()
         if (temp_inserted.block_elementnum > limited_elementnum - 5)
         {
           block_split(indexblock, temp_inserted.block_elementnum);
-        }
+        }//超出限额，裂块
       }
     }
 
