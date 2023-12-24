@@ -355,8 +355,7 @@ int main()
           DataBase.write(temp_now, 8 + (indexblock - 1) * sizeof(Block));//先把删掉以后的这个块写回去
           if (temp_now.block_elementnum == 0)//如果发现这是一个空块，那就只能无视它了
           {
-            blocknum--;
-            for (int index_now = 1;;index_now = list_index[index_now].block_next)
+            for (int index_now = 1;index_now != 0;index_now = list_index[index_now].block_next)
             {
               if (list_index[index_now].block_next == indexblock)
               {
@@ -365,6 +364,16 @@ int main()
                 break;
               }
             }//找到原来指向这个块的块，修改以后写入他，覆盖原来的
+            for (int index_now = 1; index_now != 0; index_now = list_index[index_now].block_next)
+            {
+              if (list_index[index_now].block_next == blocknum)
+              {
+                list_index[index_now].block_next = indexblock;
+                DataBase.write(list_index[index_now], 8 + (indexblock - 1) * sizeof(Block));
+              }
+            }//考虑将末尾的块头放到这个已经空的块头空间里，这样使得后面写进去的时候不会丢失信息
+            //还有另一个可以考虑的方法是采用将块头放到另一个文件里，但是这样的话又得remake（by llz）
+            //blocknum--;
             DataBase.write_info(blocknum, 1);//更改块的数量
           }
         }
