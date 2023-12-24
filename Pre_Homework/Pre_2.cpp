@@ -2,7 +2,7 @@
 #include <bits/stdc++.h>
 #include <cstring>
 using namespace std;
-static const int limited_elementnum = 10;
+static const int limited_elementnum = 1000;
 template<class T, int info_len = 2>
 class MemoryRiver {
 private:
@@ -163,6 +163,7 @@ int find_whichblock(Block &target_data)
 Block insert(Block &target_data, int element_num, bool insert_flag)
 {
   DataBase.read(list_data[1], pos * sizeof(Block) * limited_elementnum + 8, element_num);//把整个块读出来
+  //cout << list_data[1].index << " " << list_data[1].value << " " <<list_data[2].index << " " << list_data[2].value << endl;
   int insert_pos = lower_bound(list_data + 1, list_data + element_num + 1, target_data) - list_data - 1;
   //cout << insert_pos << endl;
   if (list_data[insert_pos + 1] == target_data) 
@@ -172,7 +173,7 @@ Block insert(Block &target_data, int element_num, bool insert_flag)
   }//如果已经有重复的，就不插入进去了
   else if (insert_pos == 0)
   {
-    DataBase.write(target_data, pos * sizeof(Block) * limited_elementnum);
+    DataBase.write(target_data, pos * sizeof(Block) * limited_elementnum + 8);
     DataBase.write(list_data[1], pos * sizeof(Block) * limited_elementnum + 8 + sizeof (Block), element_num);
     return target_data;
   }//如果是最小的一个，那就放到第一个位置
@@ -190,6 +191,7 @@ Block insert(Block &target_data, int element_num, bool insert_flag)
 bool find(Block &target_data, int element_num, bool &find_flag)
 {
   DataBase.read(list_data[1], pos * sizeof(Block) * limited_elementnum + 8, element_num);//把整个块读出来
+  //cout << list_data[1].index << " " << list_data[1].value << " " <<list_data[2].index << " " << list_data[2].value << endl;
   int find_pos = lower_bound(list_data + 1, list_data + element_num + 1, target_data) - list_data - 1;
   for (int i = find_pos + 1; i <= element_num; i++)
   {
@@ -232,11 +234,13 @@ void block_split (int block_pos, int element_num)
   Block temp_now;
   DataBase.read(temp_now, (block_pos - 1) * sizeof(Block) + 8);//读出来原来的块头
   DataBase.read(list_data[1], temp_now.block_pos * limited_elementnum * sizeof(Block) + 8, element_num);//读出来原来的块
+  //cout << list_data[1].index << " " << list_data[1].value << " " <<list_data[2].index << " " << list_data[2].value << endl;
   Block temp_split;
   temp_split = list_data[mid + 1];
   temp_split.block_elementnum = element_num - mid;
   temp_split.block_next = temp_now.block_next;
   temp_split.block_pos = blocknum;//把新块块头相关设定设定好
+  //cout << temp_now.block_pos << " " << temp_split.block_pos << endl;
   DataBase.write(list_data[mid + 1], blocknum * limited_elementnum * sizeof(Block) + 8, element_num - mid);//把裂出来的新块放到末尾
   DataBase.write(temp_split, (blocknum - 1) * sizeof(Block) + 8);//把新块头写到块头末尾
   temp_now.block_elementnum = mid;//llz同学证实了似乎确实可以通过改变这里的数据个数来假装后半部分没有元素了（）（）
@@ -268,7 +272,7 @@ int main()
       if (blocknum == 0)
       {
         blocknum = 1;
-        target_info.block_pos = 0;
+        target_info.block_pos = 1;
         target_info.block_elementnum = 1;
         DataBase.write_info(blocknum, 1);
         DataBase.write(target_info, 8, 1);
@@ -281,6 +285,7 @@ int main()
         int indexblock = find_whichblock(target_info);
         //cout << indexblock << endl;
         DataBase.read(temp_now, 8 + (indexblock - 1) * sizeof(Block));//找到需要更改的块的块头
+        //cout << temp_now.block_pos << endl;
         pos = temp_now.block_pos;//现在的位置
         bool insert_flag = 0;
         temp_inserted = insert (target_info, temp_now.block_elementnum, insert_flag);//插入以后的块头
@@ -313,14 +318,17 @@ int main()
         Block temp_now;
         int indexblock = find_whichblock(target_info);
         //cout << indexblock << endl;
-        DataBase.read(temp_now, 8 + (indexblock - 1) * sizeof(Block));//找到需要查询的块的块头
-        pos = temp_now.block_pos;//现在的位置
+        
         bool find_flag = 0;
         //cout << temp_now.block_elementnum << endl;
         bool flag = 1;
         while (flag)
         {
+          DataBase.read(temp_now, 8 + (indexblock - 1) * sizeof(Block));//找到需要查询的块的块头
+          pos = temp_now.block_pos;//现在的位置
+          //cout << temp_now.block_elementnum << " " << temp_now.block_pos << endl;
           flag = find(target_info, temp_now.block_elementnum, find_flag);
+          indexblock = temp_now.block_next;
           if (temp_now.block_next == 0) break;
         }
         //cout << find_flag << endl;
@@ -355,7 +363,7 @@ int main()
           DataBase.write(temp_now, 8 + (indexblock - 1) * sizeof(Block));//先把删掉以后的这个块写回去
           if (temp_now.block_elementnum == 0)//如果发现这是一个空块，那就只能无视它了
           {
-            for (int index_now = 1;index_now != 0;index_now = list_index[index_now].block_next)
+            for (int index_now = temp_now.block_next;index_now != 0;index_now = list_index[index_now].block_next)
             {
               if (list_index[index_now].block_next == indexblock)
               {
@@ -364,12 +372,13 @@ int main()
                 break;
               }
             }//找到原来指向这个块的块，修改以后写入他，覆盖原来的
-            for (int index_now = 1; index_now != 0; index_now = list_index[index_now].block_next)
+            for (int index_now = temp_now.block_next; index_now != 0; index_now = list_index[index_now].block_next)
             {
               if (list_index[index_now].block_next == blocknum)
               {
                 list_index[index_now].block_next = indexblock;
                 DataBase.write(list_index[index_now], 8 + (indexblock - 1) * sizeof(Block));
+                break;
               }
             }//考虑将末尾的块头放到这个已经空的块头空间里，这样使得后面写进去的时候不会丢失信息
             //还有另一个可以考虑的方法是采用将块头放到另一个文件里，但是这样的话又得remake（by llz）
