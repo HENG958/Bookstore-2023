@@ -2,7 +2,7 @@
 #include <bits/stdc++.h>
 #include <cstring>
 using namespace std;
-static const int limited_elementnum = 1000;
+static const int limited_elementnum = 2000;
 template<class T, int info_len = 2>
 class MemoryRiver {
 private:
@@ -16,6 +16,8 @@ public:
 
     void initialise(string FN = "") {
         if (FN != "") file_name = FN;
+        if (access(file_name.c_str(), F_OK) == 0) 
+          return;//这句话如果不加会导致文件狂狂重开清零，玛德
         file.open(file_name, std::ios::out);
         int tmp = 0;
         for (int i = 0; i < info_len; ++i)
@@ -26,7 +28,7 @@ public:
     //读出第n个int的值赋给tmp，1_base
     void get_info(int &tmp, int n) {
         if (n > info_len) return;
-        file.open(file_name, std::ios::in);
+        file.open(file_name);
         file.seekg((n - 1) * sizeof(int), std::ios::beg);
         file.read(reinterpret_cast<char *>(&tmp), sizeof(int));
         file.close();
@@ -35,7 +37,7 @@ public:
     //将tmp写入第n个int的位置，1_base
     void write_info(int tmp, int n) {
         if (n > info_len) return;
-        file.open(file_name, std::ios::in | std::ios::out);
+        file.open(file_name);
         file.seekp((n - 1) * sizeof(int), std::ios::beg);
         file.write(reinterpret_cast<char *>(&tmp), sizeof(int));
         file.close();
@@ -54,7 +56,7 @@ public:
       return;
     }*/
     void write(T &t, long long place_size, int size = 1) {
-      file.open(file_name, std::ios::in | std::ios::out);
+      file.open(file_name);
       file.seekp(place_size);
       int index = file.tellp();
       file.write(reinterpret_cast<char *>(&t), sizeof(T) * size);
@@ -63,8 +65,8 @@ public:
     }
     //用t的值更新位置索引index对应的对象，保证调用的index都是由write函数产生
     void update(T &t, const int index) {
-      file.open(file_name, std::ios::in | std::ios::out);
-      file.seekp(index, std::ios::beg);
+      file.open(file_name);
+      file.seekp(index);
       file.write(reinterpret_cast<char *>(&t), sizeof(T));
       file.close();
     }
@@ -72,16 +74,16 @@ public:
     //读出位置索引index对应的T对象的值并赋值给t，保证调用的index都是由write函数产生
     
     void read(T &t, const int index, int size = 1) {
-      file.open(file_name, std::ios::in);
-      file.seekg(index, std::ios::beg);
+      file.open(file_name);
+      file.seekg(index);
       file.read(reinterpret_cast<char *>(&t), sizeof(T) * size);
       file.close();
       return;
     }
     //删除位置索引index对应的对象(不涉及空间回收时，可忽略此函数)，保证调用的index都是由write函数产生
     void Delete(int index) {
-      file.open(file_name, std::ios::out);
-      file.seekp(index, std::ios::beg);
+      file.open(file_name);
+      file.seekp(index);
       int tmp = 0;
       file.write(reinterpret_cast<char *>(&tmp), sizeof(int));
       file.close();
@@ -295,7 +297,7 @@ int main()
         temp_inserted.block_pos = temp_now.block_pos;//更新块头的各项数据指标
         //cout << temp_inserted.block_elementnum << endl;
         DataBase.write(temp_inserted, 8 + (indexblock - 1) * sizeof(Block));//把块头写进去
-        if (temp_inserted.block_elementnum > limited_elementnum - 5)
+        if (temp_inserted.block_elementnum > limited_elementnum - 10)
         {
           block_split(indexblock, temp_inserted.block_elementnum);
         }//超出限额，裂块
